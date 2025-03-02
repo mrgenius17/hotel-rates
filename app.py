@@ -1,6 +1,3 @@
-# rate price example: https://data.xotelo.com/api/rates?hotel_key=g50207-d101729&chk_in=2025-11-25&chk_out=2025-11-26&currency=USD
-# hotel list example: https://data.xotelo.com/api/list?location_key=g50207&offset=0&limit=30&sort=best_value
-
 import requests
 from datetime import date, timedelta
 import json
@@ -8,6 +5,11 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill
 
 CLE_AREA_CODE = "g50207"
+BASE_URL = f"https://data.xotelo.com/api/rates?currency=USD"
+RED_FILL = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
+YELLOW_FILL = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
+GREEN_FILL = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
+
 HOTEL_KEYS = {
     "Comfort Inn": "d101729",
     "Holiday Inn": "d122215",
@@ -22,11 +24,7 @@ HOTEL_KEYS = {
     "Marriott Key Tower": "d95183",
     "Aloft": "d4375420"
 }
-BASE_URL = f"https://data.xotelo.com/api/rates?currency=USD"
 
-RED_FILL = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
-YELLOW_FILL = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
-GREEN_FILL = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
 start = 0
 end = 2
 
@@ -46,7 +44,6 @@ def main():
             sheet.cell(row=2+i, column=j, value=rate)
 
     color_rates(sheet)
-
     wb.save(f"rates-{today_date}.xlsx")
     
 def initialize_workbook(date):
@@ -61,23 +58,19 @@ def get_rate(hotel_key, date):
 
     response = requests.get(url)
     if not response:
-        print(f"Error in fetching rate for hotel: {hotel_key} for date: {date}")
-        return None
+        raise Exception(f"Error in fetching rate for hotel: {hotel_key} for date: {date}")
     
     data = json.loads(response.text)
 
     if "error" in data and data["error"] is not None:
-        print(f"Error {data["error"]["status_code"]}: {data["error"]["message"]}")
-        return None
+        raise Exception(f"Error {data["error"]["status_code"]}: {data["error"]["message"]}")
 
     if "result" not in data or data["result"] is None:
-        print("Error: Missing 'result' in response.")
-        return None
+        raise Exception("Error: Missing 'result' in response.")
 
     rates = data["result"]["rates"]
     if not rates:
-        print(f"No rates found for hotel: {hotel_key} for date: {date}")
-        return None
+        raise Exception(f"No rates found for hotel: {hotel_key} for date: {date}")
     
     return rates[0]["rate"]
 
