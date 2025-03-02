@@ -7,8 +7,8 @@ import json
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill
 
-cleveland_area_code = "g50207"
-hotel_keys = {
+CLE_AREA_CODE = "g50207"
+HOTEL_KEYS = {
     "Comfort Inn": "d101729",
     "Holiday Inn": "d122215",
     "Hotel Indigo": "d122210",
@@ -22,21 +22,18 @@ hotel_keys = {
     "Marriott Key Tower": "d95183",
     "Aloft": "d4375420"
 }
-base_url = f"https://data.xotelo.com/api/rates?currency=USD"
-today_date = date.today()
-wb = Workbook()
-# wb = load_workbook(f"rates-{today_date}.xlsx")
-sheet = wb.active
-red_fill = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
-yellow_fill = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
-green_fill = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
+BASE_URL = f"https://data.xotelo.com/api/rates?currency=USD"
+
+RED_FILL = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
+YELLOW_FILL = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
+GREEN_FILL = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
 start = 0
 end = 2
 
 
 def main():
-
-    write_header(sheet)
+    today_date = date.today()
+    wb, sheet = initialize_workbook(date=today_date)
 
     for i in range(start, end):
         date = today_date + timedelta(days=i)
@@ -44,7 +41,7 @@ def main():
 
         sheet.cell(row=2+i, column=1, value=formatted_date)
 
-        for j, hotel_key in enumerate(hotel_keys.keys(), start=2):
+        for j, hotel_key in enumerate(HOTEL_KEYS.keys(), start=2):
             rate = get_rate(hotel_key, date)
             sheet.cell(row=2+i, column=j, value=rate)
 
@@ -52,12 +49,19 @@ def main():
 
     wb.save(f"rates-{today_date}.xlsx")
     
+def initialize_workbook(date):
+    wb = Workbook()
+    # wb = load_workbook(f"rates-{today_date}.xlsx")
+    sheet = wb.active
+    write_header(sheet)
+    return wb, sheet
+
 def get_rate(hotel_key, date):
-    url = f"{base_url}&hotel_key={cleveland_area_code}-{hotel_keys[hotel_key]}&chk_in={date}&chk_out={date + timedelta(days=1)}"
+    url = f"{BASE_URL}&hotel_key={CLE_AREA_CODE}-{HOTEL_KEYS[hotel_key]}&chk_in={date}&chk_out={date + timedelta(days=1)}"
 
     response = requests.get(url)
     if not response:
-        print(f"Error in fetching rate for hotel: {hotel_key} for date: {today_date}")
+        print(f"Error in fetching rate for hotel: {hotel_key} for date: {date}")
         return None
     
     data = json.loads(response.text)
@@ -72,33 +76,33 @@ def get_rate(hotel_key, date):
 
     rates = data["result"]["rates"]
     if not rates:
-        print(f"No rates found for hotel: {hotel_key} for date: {today_date}")
+        print(f"No rates found for hotel: {hotel_key} for date: {date}")
         return None
     
     return rates[0]["rate"]
 
 def write_header(sheet):
     sheet.cell( row=1, column=1 , value="Date")
-    for i, hotel_name in enumerate(list(hotel_keys.keys()), start=2):
+    for i, hotel_name in enumerate(list(HOTEL_KEYS.keys()), start=2):
         sheet.cell(row=1, column=i, value=hotel_name)
 
 def color_rates(sheet):
     for i in range(2, end+2):
-        sheet.cell(row=i, column=2).fill = green_fill
+        sheet.cell(row=i, column=2).fill = GREEN_FILL
         if sheet.cell(row=i, column=2).value is None:
             continue
         comfortinn_rate = sheet.cell(row=i, column=2).value
 
         three_lowest_rates = []
 
-        for j in range(3, len(hotel_keys.keys()) + 2):
+        for j in range(3, len(HOTEL_KEYS.keys()) + 2):
             if sheet.cell(row=i, column=j).value is None:
                 continue
             rate = sheet.cell(row=i, column=j).value
             cell = sheet.cell(row=i, column=j)
             
             if rate < comfortinn_rate:
-                sheet.cell(row=i, column=j).fill = red_fill
+                sheet.cell(row=i, column=j).fill = RED_FILL
                 continue
             
             if len(three_lowest_rates)<3:
@@ -111,7 +115,7 @@ def color_rates(sheet):
 
         for cell in three_lowest_rates:
             if cell is not None:
-                cell.fill = yellow_fill        
+                cell.fill = YELLOW_FILL        
 
 
 if __name__ == "__main__":
