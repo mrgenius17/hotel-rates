@@ -31,7 +31,7 @@ def main():
     wb, sheet = initialize_workbook()
 
     intro_string = f'''
-    Made with ❤️ by Darshan Thakkar
+    Made with ❤️  by Darshan Thakkar
     This program pulls hotel rates from the Xotelo API for a list of hotels in Cleveland, Ohio.
     These rates are gathered from Trip Advisor, which lists rates from OTA sites like Expedia and Booking.com.
     The rates are pulled for a 30-day period starting tomorrow.
