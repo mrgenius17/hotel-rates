@@ -30,11 +30,21 @@ def main():
     today_date = date.today()
     wb, sheet = initialize_workbook()
 
+    intro_string = f'''
+    This program pulls hotel rates from the Xotelo API for a list of hotels in Cleveland, Ohio.
+    The rates are pulled for a 30-day period starting tomorrow.
+    These rates are gathered from Trip Advisor, which lists rates from Expedia and Booking.com.
+    Rates will be saved to file: rates-{today_date}.xlsx
+    '''
+
+    print(intro_string)
+
     for i in range(start, end):
         target_date = today_date + timedelta(days=i)
-        formatted_date = target_date.strftime("%m/%d")
 
+        formatted_date = target_date.strftime("%m/%d")
         sheet.cell(row=2+i, column=1, value=formatted_date)
+        print(f"Pulling rates for date: {formatted_date}")
 
         for j, hotel_key in enumerate(HOTEL_KEYS.keys(), start=2):
             rate = get_rate(hotel_key, target_date)
