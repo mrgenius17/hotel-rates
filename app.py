@@ -13,17 +13,17 @@ HOTEL_KEYS = {
     "Hotel Indigo": "d122210",
     "Drury Plaza": "d9862281",
     "Residence Inn": "d122181",
-    "DoubleTree by Hilton": "d1372556",
+    "DoubleTree": "d1372556",
     "Hilton Garden": "d240589",
     "Hampton Inn": "d111524",
     "The Westin": "d95215",
     "Crowne Plaza": "d95218",
-    "Marriott Key Tower": "d95183",
+    "Marriott Key": "d95183",
     "Aloft": "d4375420"
 }
 
 start = 1 #start tomorrow, since api disabled pulling rates for today 
-end = 2
+end = 31 #run for 30 days
 
 
 def main():
@@ -58,8 +58,11 @@ def get_rate(hotel_key, date):
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
-    except:
-        print(f"Request error for hotel: {hotel_key} on date: {date}")
+    except requests.exceptions.RequestException as e:
+        print(f"Network error for hotel: {hotel_key} on date: {date} - {e}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error for hotel: {hotel_key} on date: {date} - {e}")
         return None
 
     if "error" in data and data["error"] is not None:
@@ -82,12 +85,24 @@ def write_header(sheet):
     for i, hotel_name in enumerate(list(HOTEL_KEYS.keys()), start=2):
         sheet.cell(row=1, column=i, value=hotel_name)
 
+    sheet.cell(row=2, column=3, value="Our Rate")
+    sheet.cell(row=2, column=5, value="Next three higher rates")
+    sheet.cell(row=2, column=8, value="Lower than our rate")
+
+    for col_idx in range(1, sheet.max_column + 1):
+        col_letter = sheet.cell(row=1, column=col_idx).column_letter
+        sheet.column_dimensions[col_letter].width = 12
+
 def color_rates(sheet):
     RED_FILL = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
     YELLOW_FILL = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
     GREEN_FILL = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
 
-    for i in range(2, end+2):
+    sheet.cell(row=2, column=2).fill = GREEN_FILL
+    sheet.cell(row=2, column=4).fill = YELLOW_FILL
+    sheet.cell(row=2, column=7).fill = RED_FILL
+
+    for i in range(3, end+2):
         sheet.cell(row=i, column=2).fill = GREEN_FILL
         if sheet.cell(row=i, column=2).value is None:
             continue
@@ -118,7 +133,6 @@ def color_rates(sheet):
         for cell in three_lowest_rates:
             if cell is not None:
                 cell.fill = YELLOW_FILL        
-
 
 if __name__ == "__main__":
     main()
