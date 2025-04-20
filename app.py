@@ -6,9 +6,6 @@ from openpyxl.styles import PatternFill
 
 CLE_AREA_CODE = "g50207"
 BASE_URL = f"https://data.xotelo.com/api/rates?currency=USD"
-RED_FILL = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
-YELLOW_FILL = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
-GREEN_FILL = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
 
 HOTEL_KEYS = {
     "Comfort Inn": "d101729",
@@ -25,28 +22,29 @@ HOTEL_KEYS = {
     "Aloft": "d4375420"
 }
 
-start = 0
+start = 1 #start tomorrow, since api disabled pulling rates for today 
 end = 2
 
 
 def main():
     today_date = date.today()
-    wb, sheet = initialize_workbook(date=today_date)
+    wb, sheet = initialize_workbook()
 
     for i in range(start, end):
-        date = today_date + timedelta(days=i)
-        formatted_date = date.strftime("%m/%d")
+        target_date = today_date + timedelta(days=i)
+        formatted_date = target_date.strftime("%m/%d")
 
         sheet.cell(row=2+i, column=1, value=formatted_date)
 
         for j, hotel_key in enumerate(HOTEL_KEYS.keys(), start=2):
-            rate = get_rate(hotel_key, date)
-            sheet.cell(row=2+i, column=j, value=rate)
+            rate = get_rate(hotel_key, target_date)
+            if rate is not None:
+                sheet.cell(row=2+i, column=j, value=rate)
 
     color_rates(sheet)
     wb.save(f"rates-{today_date}.xlsx")
     
-def initialize_workbook(date):
+def initialize_workbook():
     wb = Workbook()
     # wb = load_workbook(f"rates-{today_date}.xlsx")
     sheet = wb.active
@@ -56,21 +54,26 @@ def initialize_workbook(date):
 def get_rate(hotel_key, date):
     url = f"{BASE_URL}&hotel_key={CLE_AREA_CODE}-{HOTEL_KEYS[hotel_key]}&chk_in={date}&chk_out={date + timedelta(days=1)}"
 
-    response = requests.get(url)
-    if not response:
-        raise Exception(f"Error in fetching rate for hotel: {hotel_key} for date: {date}")
-    
-    data = json.loads(response.text)
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+    except:
+        print(f"Request error for hotel: {hotel_key} on date: {date}")
+        return None
 
     if "error" in data and data["error"] is not None:
-        raise Exception(f"Error {data["error"]["status_code"]}: {data["error"]["message"]}")
+        print(f"Error {data["error"]["status_code"]}: {data["error"]["message"]}")
+        return None
 
     if "result" not in data or data["result"] is None:
-        raise Exception("Error: Missing 'result' in response.")
+        print("Error: Missing 'result' in response.")
+        return None
 
     rates = data["result"]["rates"]
     if not rates:
-        raise Exception(f"No rates found for hotel: {hotel_key} for date: {date}")
+        print(f"No rates found for hotel: {hotel_key} for date: {date}")
+        return None
     
     return rates[0]["rate"]
 
@@ -80,6 +83,10 @@ def write_header(sheet):
         sheet.cell(row=1, column=i, value=hotel_name)
 
 def color_rates(sheet):
+    RED_FILL = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
+    YELLOW_FILL = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
+    GREEN_FILL = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
+
     for i in range(2, end+2):
         sheet.cell(row=i, column=2).fill = GREEN_FILL
         if sheet.cell(row=i, column=2).value is None:
@@ -92,6 +99,8 @@ def color_rates(sheet):
             if sheet.cell(row=i, column=j).value is None:
                 continue
             rate = sheet.cell(row=i, column=j).value
+            if not isinstance(rate, (int)):
+                continue
             cell = sheet.cell(row=i, column=j)
             
             if rate < comfortinn_rate:
