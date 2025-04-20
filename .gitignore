@@ -3,3 +3,10 @@
 
 # Ignore my notes
 notes.txt
+
+# virtual environment
+venv/
+
+# PyInstaller build artifacts
+build/
+dist/
