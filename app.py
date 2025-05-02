@@ -2,13 +2,13 @@ import requests
 from datetime import date, timedelta
 import json
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Font, Alignment, Border, Side
 
 CLE_AREA_CODE = "g50207"
 BASE_URL = f"https://data.xotelo.com/api/rates?currency=USD"
 
+COMFORT_INN_KEY = "d101729"
 HOTEL_KEYS = {
-    "Comfort Inn": "d101729",
     "Holiday Inn": "d122215",
     "Hotel Indigo": "d122210",
     "Drury Plaza": "d9862281",
@@ -18,13 +18,12 @@ HOTEL_KEYS = {
     "Hampton Inn": "d111524",
     "The Westin": "d95215",
     "Crowne Plaza": "d95218",
-    "Marriott Key": "d95183",
+    "Marriott@Key": "d95183",
     "Aloft": "d4375420"
 }
 
 start = 1 #start tomorrow, since api disabled pulling rates for today 
-end = 31 #run for 30 days
-
+end = 31 #inclusive, run for 31 days
 
 def main():
     today_date = date.today()
@@ -40,19 +39,43 @@ def main():
 
     print(intro_string)
 
-    for i in range(start, end):
+    for i in range(start, end+1):
         target_date = today_date + timedelta(days=i)
-
         formatted_date = target_date.strftime("%m/%d")
-        sheet.cell(row=2+i, column=1, value=formatted_date)
+
+        date_cell = sheet.cell(row=1+i, column=1, value=formatted_date)
+        date_cell.font = Font(bold=True)
         print(f"Pulling rates for date: {formatted_date}")
 
-        for j, hotel_key in enumerate(HOTEL_KEYS.keys(), start=2):
+        # Comfort Inn
+        comfort_inn_rate = get_rate(COMFORT_INN_KEY, target_date)
+        comfort_inn_cell = sheet.cell(row=1+i, column=2)
+        comfort_inn_cell.alignment = Alignment(horizontal='center')
+        if comfort_inn_rate is not None:
+            comfort_inn_cell.value = comfort_inn_rate
+        else:
+            comfort_inn_cell.value = "N/A"
+
+        # dict to store hotel name and rate
+        hotel_rates = {}
+
+        # for all hotels in HOTEL_KEYS, get the rate and store in hotel_rates dict
+        for hotel_name, hotel_key in HOTEL_KEYS.items():
             rate = get_rate(hotel_key, target_date)
             if rate is not None:
-                sheet.cell(row=2+i, column=j, value=rate)
+                hotel_rates[hotel_name] = rate
 
-    color_rates(sheet)
+        # sort the dict by rate
+        hotel_rates = sorted(hotel_rates.items(), key=lambda x: x[1])
+
+        # write the first three hotel name and rate to the sheet
+        for idx, (hotel_name, rate) in enumerate(hotel_rates[:3]):
+            hotel_name_cell = sheet.cell(row=1+i, column=3+idx*2, value=hotel_name)
+            hotel_rate_cell = sheet.cell(row=1+i, column=4+idx*2, value=rate)
+            hotel_rate_cell.alignment = Alignment(horizontal='center')
+            
+
+    finalize_sheet(sheet)
     wb.save(f"rates-{today_date}.xlsx")
     
 def initialize_workbook():
@@ -63,7 +86,7 @@ def initialize_workbook():
     return wb, sheet
 
 def get_rate(hotel_key, date):
-    url = f"{BASE_URL}&hotel_key={CLE_AREA_CODE}-{HOTEL_KEYS[hotel_key]}&chk_in={date}&chk_out={date + timedelta(days=1)}"
+    url = f"{BASE_URL}&hotel_key={CLE_AREA_CODE}-{hotel_key}&chk_in={date}&chk_out={date + timedelta(days=1)}"
 
     try:
         response = requests.get(url)
@@ -93,57 +116,61 @@ def get_rate(hotel_key, date):
 
 def write_header(sheet):
     sheet.cell( row=1, column=1 , value="Date")
-    for i, hotel_name in enumerate(list(HOTEL_KEYS.keys()), start=2):
-        sheet.cell(row=1, column=i, value=hotel_name)
+    
+    sheet.cell(row=1, column=2, value = "Comfort Inn")
 
-    sheet.cell(row=2, column=3, value="Our Rate")
-    sheet.cell(row=2, column=5, value="Next three higher rates")
-    sheet.cell(row=2, column=8, value="Lower than our rate")
+    sheet.cell(row=1, column=3, value = "Hotel 1")
+    sheet.cell(row=1, column=4, value = "Rate 1")
+    
+    sheet.cell(row=1, column=5, value = "Hotel 2")
+    sheet.cell(row=1, column=6, value = "Rate 2")
 
-    for col_idx in range(1, sheet.max_column + 1):
-        col_letter = sheet.cell(row=1, column=col_idx).column_letter
-        sheet.column_dimensions[col_letter].width = 12
+    sheet.cell(row=1, column=7, value = "Hotel 3")
+    sheet.cell(row=1, column=8, value = "Rate 3")
 
-def color_rates(sheet):
-    RED_FILL = PatternFill(start_color="FF6961", end_color="FF6961", fill_type="solid")
-    YELLOW_FILL = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
-    GREEN_FILL = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
+def finalize_sheet(sheet):
 
-    sheet.cell(row=2, column=2).fill = GREEN_FILL
-    sheet.cell(row=2, column=4).fill = YELLOW_FILL
-    sheet.cell(row=2, column=7).fill = RED_FILL
+    # bold and center the headers row
+    for column in range(1, 9):
+        cell = sheet.cell(row=1, column=column)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
 
-    for i in range(3, end+2):
-        sheet.cell(row=i, column=2).fill = GREEN_FILL
-        if sheet.cell(row=i, column=2).value is None:
-            continue
-        comfortinn_rate = sheet.cell(row=i, column=2).value
+    sheet.column_dimensions['A'].width = 9 # date column
+    sheet.column_dimensions['B'].width = 14 # comfort inn rate column
+    # hotel name columns
+    sheet.column_dimensions['C'].width = 15
+    sheet.column_dimensions['E'].width = 15
+    sheet.column_dimensions['F'].width = 10
+    # hotel rate columns
+    sheet.column_dimensions['D'].width = 10
+    sheet.column_dimensions['G'].width = 15
+    sheet.column_dimensions['H'].width = 10
 
-        three_lowest_rates = []
+    # Define a thin border for all sides
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
 
-        for j in range(3, len(HOTEL_KEYS.keys()) + 2):
-            if sheet.cell(row=i, column=j).value is None:
-                continue
-            rate = sheet.cell(row=i, column=j).value
-            if not isinstance(rate, (int)):
-                continue
-            cell = sheet.cell(row=i, column=j)
-            
-            if rate < comfortinn_rate:
-                sheet.cell(row=i, column=j).fill = RED_FILL
-                continue
-            
-            if len(three_lowest_rates)<3:
-                three_lowest_rates.append(cell)
-                three_lowest_rates.sort(key=lambda x: x.value)
-            elif rate < three_lowest_rates[2].value:
-                three_lowest_rates[2] = cell
-                three_lowest_rates.sort(key=lambda x: x.value)
+    # apply border and font 14 to all cells in the worksheet
+    for row in sheet.iter_rows():
+        # set row height
+        sheet.row_dimensions[row[0].row].height = 21
+        
+        for cell in row:
+            cell.border = thin_border
+            cell.font = Font(size=14, bold=cell.font.bold)
 
-
-        for cell in three_lowest_rates:
-            if cell is not None:
-                cell.fill = YELLOW_FILL        
+    # set custom margins
+    sheet.page_margins.left = 0.5
+    sheet.page_margins.right = 0.25
+    sheet.page_margins.top = 0.75
+    sheet.page_margins.bottom = 0.75
+    sheet.page_margins.header = 0.3
+    sheet.page_margins.footer = 0.3
 
 if __name__ == "__main__":
     main()
