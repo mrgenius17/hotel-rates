@@ -4,26 +4,18 @@ import json
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, Border, Side
 
-CLE_AREA_CODE = "g50207"
 BASE_URL = f"https://data.xotelo.com/api/rates?currency=USD"
 
-COMFORT_INN_KEY = "d101729"
 HOTEL_KEYS = {
-    "Holiday Inn": "d122215",
-    "Hotel Indigo": "d122210",
-    "Drury Plaza": "d9862281",
-    "Residence Inn": "d122181",
-    "DoubleTree": "d1372556",
-    "Hilton Garden": "d240589",
-    "Hampton Inn": "d111524",
-    "The Westin": "d95215",
-    "Crowne Plaza": "d95218",
-    "Marriott@Key": "d95183",
-    "Aloft": "d4375420"
+    "Quality Inn": "g50892-d95503",
+    "Comfort Inn": "g50892-d256944",
+    "Holiday Inn": "g50892-d631380",
+    "Laquinta Macedonia": "g50587-d226031",
+    "Comfort Independence": "g50470-d95403"
 }
 
 start = 1 #start tomorrow, since api disabled pulling rates for today 
-end = 31 #inclusive, run for 31 days
+end = 30 #inclusive, run for 30 days
 
 def main():
     today_date = date.today()
@@ -31,7 +23,7 @@ def main():
 
     intro_string = f'''
     Made with ❤️  by Darshan Thakkar
-    This program pulls hotel rates from the Xotelo API for a list of hotels in Cleveland, Ohio.
+    This program pulls hotel rates from the Xotelo API for a list of hotels in Richfield, Ohio.
     These rates are gathered from Trip Advisor, which lists rates from OTA sites like Expedia and Booking.com.
     The rates are pulled for a 30-day period starting tomorrow.
     Rates will be saved to file: rates-{today_date}.xlsx
@@ -47,33 +39,14 @@ def main():
         date_cell.font = Font(bold=True)
         print(f"Pulling rates for date: {formatted_date}")
 
-        # Comfort Inn
-        comfort_inn_rate = get_rate(COMFORT_INN_KEY, target_date)
-        comfort_inn_cell = sheet.cell(row=1+i, column=2)
-        comfort_inn_cell.alignment = Alignment(horizontal='center')
-        if comfort_inn_rate is not None:
-            comfort_inn_cell.value = comfort_inn_rate
-        else:
-            comfort_inn_cell.value = "N/A"
-
-        # dict to store hotel name and rate
-        hotel_rates = {}
-
-        # for all hotels in HOTEL_KEYS, get the rate and store in hotel_rates dict
-        for hotel_name, hotel_key in HOTEL_KEYS.items():
+        for col, (hotel_name, hotel_key) in enumerate(HOTEL_KEYS.items()):
             rate = get_rate(hotel_key, target_date)
+            cell = sheet.cell(row=1+i, column=3+col)
+            cell.alignment = Alignment(horizontal='center')
             if rate is not None:
-                hotel_rates[hotel_name] = rate
-
-        # sort the dict by rate
-        hotel_rates = sorted(hotel_rates.items(), key=lambda x: x[1])
-
-        # write the first three hotel name and rate to the sheet
-        for idx, (hotel_name, rate) in enumerate(hotel_rates[:3]):
-            hotel_name_cell = sheet.cell(row=1+i, column=3+idx*2, value=hotel_name)
-            hotel_rate_cell = sheet.cell(row=1+i, column=4+idx*2, value=rate)
-            hotel_rate_cell.alignment = Alignment(horizontal='center')
-            
+                cell.value = rate
+            else:
+                cell.value = "N/A"
 
     finalize_sheet(sheet)
     wb.save(f"rates-{today_date}.xlsx")
@@ -86,7 +59,7 @@ def initialize_workbook():
     return wb, sheet
 
 def get_rate(hotel_key, date):
-    url = f"{BASE_URL}&hotel_key={CLE_AREA_CODE}-{hotel_key}&chk_in={date}&chk_out={date + timedelta(days=1)}"
+    url = f"{BASE_URL}&hotel_key={hotel_key}&chk_in={date}&chk_out={date + timedelta(days=1)}"
 
     try:
         response = requests.get(url)
@@ -115,37 +88,31 @@ def get_rate(hotel_key, date):
     return rates[0]["rate"]
 
 def write_header(sheet):
+
     sheet.cell( row=1, column=1 , value="Date")
-    
-    sheet.cell(row=1, column=2, value = "Comfort Inn")
+    sheet.cell(row=1, column=2, value = "Availability")
 
-    sheet.cell(row=1, column=3, value = "Hotel 1")
-    sheet.cell(row=1, column=4, value = "Rate 1")
-    
-    sheet.cell(row=1, column=5, value = "Hotel 2")
-    sheet.cell(row=1, column=6, value = "Rate 2")
-
-    sheet.cell(row=1, column=7, value = "Hotel 3")
-    sheet.cell(row=1, column=8, value = "Rate 3")
+    sheet.cell(row=1, column=3, value = "Quality Inn Richfield")
+    sheet.cell(row=1, column=4, value = "Comfort Inn Richfield")
+    sheet.cell(row=1, column=5, value = "Holiday Inn Richfield")
+    sheet.cell(row=1, column=6, value = "La Quinta Macedonia")
+    sheet.cell(row=1, column=7, value = "Comfort Inn Independence")
 
 def finalize_sheet(sheet):
 
     # bold and center the headers row
-    for column in range(1, 9):
+    for column in range(1, 8):
         cell = sheet.cell(row=1, column=column)
         cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal='center')
+        cell.alignment = Alignment(horizontal='center', wrap_text=True)
 
     sheet.column_dimensions['A'].width = 9 # date column
-    sheet.column_dimensions['B'].width = 14 # comfort inn rate column
-    # hotel name columns
-    sheet.column_dimensions['C'].width = 15
+    sheet.column_dimensions['B'].width = 14 # availability column
+    sheet.column_dimensions['C'].width = 15 
+    sheet.column_dimensions['D'].width = 15
     sheet.column_dimensions['E'].width = 15
-    sheet.column_dimensions['F'].width = 10
-    # hotel rate columns
-    sheet.column_dimensions['D'].width = 10
-    sheet.column_dimensions['G'].width = 15
-    sheet.column_dimensions['H'].width = 10
+    sheet.column_dimensions['F'].width = 15
+    sheet.column_dimensions['G'].width = 16
 
     # Define a thin border for all sides
     thin_border = Border(
@@ -164,8 +131,10 @@ def finalize_sheet(sheet):
             cell.border = thin_border
             cell.font = Font(size=14, bold=cell.font.bold)
 
+    sheet.row_dimensions[1].height = 42
+
     # set custom margins
-    sheet.page_margins.left = 0.5
+    sheet.page_margins.left = 0.25
     sheet.page_margins.right = 0.25
     sheet.page_margins.top = 0.75
     sheet.page_margins.bottom = 0.75
