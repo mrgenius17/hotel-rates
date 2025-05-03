@@ -49,7 +49,7 @@ def main():
                 cell.value = "N/A"
 
     finalize_sheet(sheet)
-    wb.save(f"rates-{today_date}.xlsx")
+    wb.save(f"rates-richfield-{today_date}.xlsx")
     
 def initialize_workbook():
     wb = Workbook()
